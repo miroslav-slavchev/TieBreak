@@ -1,6 +1,7 @@
 name: Playwright .NET Tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [ master ]
   pull_request:
@@ -28,21 +29,24 @@ jobs:
       - name: Build solution
         run: dotnet build --configuration Release
 
-      - name: Install Playwright Browsers
+      - name: Install Playwright CLI and browsers
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
       - name: Run Playwright Tests
-        run: dotnet test --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
-      - name: Convert test report to HTML
+      - name: Install trx2html
+        run: dotnet tool install --global trx2html
+
+      - name: Generate HTML Report from TRX
         run: |
-          dotnet tool install --global trx2html
-          trx2html TestResults/test-results.trx TestResults/test-results.html
+          mkdir -p TestResults/Report
+          trx2html TestResults/test-results.trx TestResults/Report/index.html
 
-      - name: Upload test report artifact
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: TestReport
-          path: TestResults/test-results.html
+          path: TestResults/Report
