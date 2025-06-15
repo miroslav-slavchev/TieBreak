@@ -1,8 +1,10 @@
-name: Playwright .NET Tests
+name: Playwright .NET NUnit Tests
 
 on:
   workflow_dispatch:
   push:
+    branches: [ master ]
+  pull_request:
     branches: [ master ]
 
 jobs:
@@ -18,21 +20,29 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install dependencies
+      - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build
+      - name: Build solution
         run: dotnet build --configuration Release
 
       - name: Install Playwright Browsers
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
-      - name: Run NUnit Tests
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
-      - name: Upload raw TRX result
+      - name: Run Tests and Generate NUnit XML Results
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger:"nunit;LogFilePath=test_results/results.xml"
+
+      - name: Generate HTML test report
+        uses: rjtngit/nunit-html-action@v1
+        if: always()
+        with:
+          inputXmlPath: test_results/results.xml
+          outputHtmlPath: test_results/results.html
+
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
-          name: NUnit Test Results
-          path: TestResults/test-results.trx
+          name: NUnit HTML Test Report
+          path: test_results/results.html
