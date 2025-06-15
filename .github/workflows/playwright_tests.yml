@@ -11,10 +11,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        dotnet-version: [ '8.0.x' ]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,7 +18,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: '8.0.x'
 
       - name: Install dependencies
         run: dotnet restore
@@ -35,25 +31,18 @@ jobs:
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
-      - name: Run Playwright Tests with Coverage
+      - name: Run NUnit Tests
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Install trx2html
+        run: dotnet tool install --global trx2html
+
+      - name: Generate HTML Test Report
         run: |
-          dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj \
-            --collect:"XPlat Code Coverage" \
-            --logger "trx;LogFileName=test-results.trx" \
-            --results-directory TestResults
+          trx2html TestResults/test-results.trx TestResults/test-results.html
 
-      - name: Install ReportGenerator
-        run: dotnet tool install --global dotnet-reportgenerator-globaltool
-
-      - name: Generate HTML Report
-        run: |
-          reportgenerator \
-            -reports:"TestResults/**/coverage.cobertura.xml" \
-            -targetdir:"TestResults/Report" \
-            -reporttypes:Html
-
-      - name: Upload test report artifact
+      - name: Upload HTML Test Report
         uses: actions/upload-artifact@v4
         with:
-          name: TestReport
-          path: TestResults/Report
+          name: NUnit Test Report
+          path: TestResults/test-results.html
