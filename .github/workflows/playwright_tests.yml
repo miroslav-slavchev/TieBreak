@@ -10,6 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         dotnet-version: [ '8.0.x' ]
@@ -23,20 +24,23 @@ jobs:
         with:
           dotnet-version: ${{ matrix.dotnet-version }}
 
-      - name: Restore dependencies
+      - name: Install dependencies
         run: dotnet restore
 
       - name: Build solution
         run: dotnet build --configuration Release
 
-      - name: Install Playwright CLI
-        run: dotnet tool install --global Microsoft.Playwright.CLI
-
       - name: Install Playwright Browsers
-        run: playwright install --with-deps
+        run: |
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps
 
-      - name: Run Playwright Tests
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+      - name: Run Playwright Tests with Coverage
+        run: |
+          dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj \
+            --collect:"XPlat Code Coverage" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults
 
       - name: Install ReportGenerator
         run: dotnet tool install --global dotnet-reportgenerator-globaltool
@@ -44,9 +48,9 @@ jobs:
       - name: Generate HTML Report
         run: |
           reportgenerator \
-            -reports:TestResults/test-results.trx \
-            -targetdir:TestResults/Report \
-            -reporttypes:HtmlInline_AzurePipelines
+            -reports:"TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"TestResults/Report" \
+            -reporttypes:Html
 
       - name: Upload test report artifact
         uses: actions/upload-artifact@v4
