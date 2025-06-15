@@ -50,4 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: TestReport
-          path: TestResults/test-results.html
+          path: TestResults/Report
