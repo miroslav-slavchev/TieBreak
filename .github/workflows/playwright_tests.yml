@@ -7,38 +7,42 @@ on:
     branches: [ master ]
 
 jobs:
-  playwright-tests:
-    name: Run Tests
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet-version: [ '8.0.x' ]
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: ${{ matrix.dotnet-version }}
 
-      - name: Install .NET Tools and Dependencies
+      - name: Install dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release
+
+      - name: Install Playwright Browsers
         run: |
-          dotnet restore
-          dotnet build --configuration Debug
-          pwsh bin/Debug/net8.0/playwright.ps1 install
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps
 
-      - name: Run Tests
+      - name: Run Playwright Tests
+        run: dotnet test --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Convert test report to HTML
         run: |
-          dotnet test --no-build --configuration Debug --logger "nunit;LogFilePath=TestResults/test-results.xml"
+          dotnet tool install --global trx2html
+          trx2html TestResults/test-results.trx TestResults/test-results.html
 
-      - name: Install Report Generator
-        run: dotnet tool install --global dotnet-reportgenerator-globaltool
-
-      - name: Generate HTML Test Report
-        run: |
-          reportgenerator -reports:TestResults/*.xml -targetdir:TestResults/html -reporttypes:Html
-
-      - name: Upload Test Report Artifact
+      - name: Upload test report artifact
         uses: actions/upload-artifact@v4
         with:
-          name: test-report
-          path: TestResults/html
+          name: TestReport
+          path: TestResults/test-results.html
