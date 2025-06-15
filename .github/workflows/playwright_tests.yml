@@ -36,10 +36,15 @@ jobs:
       - name: Run Playwright Tests
         run: dotnet test --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
-      - name: Convert test report to HTML
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate HTML Report
         run: |
-          dotnet tool install --global trx2html
-          trx2html TestResults/test-results.trx TestResults/test-results.html
+          reportgenerator \
+            -reports:TestResults/test-results.trx \
+            -targetdir:TestResults/Report \
+            -reporttypes:Html
 
       - name: Upload test report artifact
         uses: actions/upload-artifact@v4
