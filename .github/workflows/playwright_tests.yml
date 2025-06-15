@@ -1,0 +1,44 @@
+name: Playwright .NET Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  playwright-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install .NET Tools and Dependencies
+        run: |
+          dotnet restore
+          dotnet build --configuration Debug
+          pwsh bin/Debug/net8.0/playwright.ps1 install
+
+      - name: Run Tests
+        run: |
+          dotnet test --no-build --configuration Debug --logger "nunit;LogFilePath=TestResults/test-results.xml"
+
+      - name: Install Report Generator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate HTML Test Report
+        run: |
+          reportgenerator -reports:TestResults/*.xml -targetdir:TestResults/html -reporttypes:Html
+
+      - name: Upload Test Report Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report
+          path: TestResults/html
