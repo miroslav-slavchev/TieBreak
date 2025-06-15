@@ -22,7 +22,7 @@ namespace SwagLabs.Tests
         [SetUp]
         public async Task SetUp()
         {
-            var browser = await _playwright.Chromium.LaunchAsync(new() { Headless = false });
+            var browser = await _playwright.Chromium.LaunchAsync(new() { Headless = true });
             var context = await browser.NewContextAsync();
             var page = await context.NewPageAsync();
 
