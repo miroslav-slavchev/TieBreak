@@ -31,16 +31,16 @@ jobs:
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
-      - name: Run NUnit Tests and Save Result
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --results-directory TestResults --logger "nunit;LogFileName=test-results.xml"
+      - name: Run Tests and Save TRX Results
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
-      - name: Install NUnit2HTML
-        run: dotnet tool install --global nunit2html
+      - name: Install TRX to HTML Converter
+        run: dotnet tool install --global trx2html
 
-      - name: Generate HTML Report from NUnit XML
-        run: nunit2html TestResults/test-results.xml TestResults/test-results.html
+      - name: Generate HTML Report from TRX
+        run: trx2html TestResults/test-results.trx TestResults/test-results.html
 
-      - name: Upload Test Report
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: NUnit HTML Test Report
