@@ -23,29 +23,32 @@ jobs:
         with:
           dotnet-version: ${{ matrix.dotnet-version }}
 
-      - name: Install dependencies
+      - name: Restore dependencies
         run: dotnet restore
 
       - name: Build solution
         run: dotnet build --configuration Release
 
-      - name: Install Playwright CLI and browsers
-        run: |
-          dotnet tool install --global Microsoft.Playwright.CLI
-          playwright install --with-deps
+      - name: Install Playwright CLI
+        run: dotnet tool install --global Microsoft.Playwright.CLI
+
+      - name: Install Playwright Browsers
+        run: playwright install --with-deps
 
       - name: Run Playwright Tests
         run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
-      - name: Install trx2html
-        run: dotnet tool install --global trx2html
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
 
-      - name: Generate HTML Report from TRX
+      - name: Generate HTML Report
         run: |
-          mkdir -p TestResults/Report
-          trx2html TestResults/test-results.trx TestResults/Report/index.html
+          reportgenerator \
+            -reports:TestResults/test-results.trx \
+            -targetdir:TestResults/Report \
+            -reporttypes:HtmlInline_AzurePipelines
 
-      - name: Upload HTML Report
+      - name: Upload test report artifact
         uses: actions/upload-artifact@v4
         with:
           name: TestReport
