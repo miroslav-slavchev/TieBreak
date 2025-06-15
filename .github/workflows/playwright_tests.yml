@@ -26,26 +26,22 @@ jobs:
       - name: Build solution
         run: dotnet build --configuration Release
 
-      - name: Install Playwright CLI and Browsers
+      - name: Install Playwright Browsers
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
-      - name: Run NUnit Tests (generate TRX)
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+      - name: Run NUnit Tests and Save Result
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --results-directory TestResults --logger "nunit;LogFileName=test-results.xml"
 
-      - name: Install ReportGenerator
-        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+      - name: Install NUnit2HTML
+        run: dotnet tool install --global nunit2html
 
-      - name: Generate HTML Report from TRX
-        run: |
-          reportgenerator \
-            -reports:TestResults/test-results.trx \
-            -targetdir:TestResults/HtmlReport \
-            -reporttypes:HtmlSummary
+      - name: Generate HTML Report from NUnit XML
+        run: nunit2html TestResults/test-results.xml TestResults/test-results.html
 
-      - name: Upload HTML Test Report
+      - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
-          name: NUnit Test Report
-          path: TestResults/HtmlReport
+          name: NUnit HTML Test Report
+          path: TestResults/test-results.html
