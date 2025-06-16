@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Added permissions to resolve "HttpError: Resource not accessible by integration"
+    permissions: write-all
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
