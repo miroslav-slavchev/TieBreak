@@ -6,10 +6,9 @@ on:
     branches: [ master ]
 
 jobs:
-  test:
+  test-inventory:
     runs-on: ubuntu-latest
-    # Added permissions to resolve "HttpError: Resource not accessible by integration"
-    permissions: write-all
+    permissions: write-all # Permissions needed for checkout and artifact upload
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,44 +22,104 @@ jobs:
         run: dotnet restore
 
       - name: Build solution
-        run: dotnet dotnet build --configuration Release
+        run: dotnet build --configuration Release
 
       - name: Install Playwright CLI
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
-      - name: Create test_results folder
+      - name: Create test_results folder for Inventory Tests
         run: mkdir -p test_results
 
-      - name: Run tests and generate TRX report
-        # The --results-directory ensures the TRX file is placed in the specified folder.
-        # LogFileName specifies the file name within that directory.
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results.trx" --results-directory test_results
+      - name: Run Inventory Tests and generate TRX report
+        # Filter tests by namespace starting with 'SwagLabs.Tests.InventoryItems'
+        # Output to a specific file name in the test_results directory
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-inventory.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.InventoryItems"
 
-      - name: Check if TRX report was created
-        # This step helps verify the file path for debugging purposes.
+      - name: Upload Inventory TRX Report
+        uses: actions/upload-artifact@v4
+        if: always() # Upload even if tests fail
+        with:
+          name: Inventory-TRX-Report # Unique name for this artifact
+          path: test_results/results-inventory.trx
+          if-no-files-found: ignore # Ignore if no report is found (e.g., if tests couldn't run)
+
+  test-shopping-cart:
+    runs-on: ubuntu-latest
+    permissions: write-all # Permissions needed for checkout and artifact upload
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release
+
+      - name: Install Playwright CLI
         run: |
-          echo "Looking for TRX files in test_results directory..."
-          ls -la test_results/ || echo "No test_results folder or files found"
-          find test_results/ -name "*.trx" -type f
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps
+
+      - name: Create test_results folder for Shopping Cart Tests
+        run: mkdir -p test_results
+
+      - name: Run Shopping Cart Tests and generate TRX report
+        # Filter tests by namespace starting with 'SwagLabs.Tests.ShoppingCartTests'
+        # Output to a specific file name in the test_results directory
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-shopping-cart.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.ShoppingCartTests"
+
+      - name: Upload Shopping Cart TRX Report
+        uses: actions/upload-artifact@v4
+        if: always() # Upload even if tests fail
+        with:
+          name: ShoppingCart-TRX-Report # Unique name for this artifact
+          path: test_results/results-shopping-cart.trx
+          if-no-files-found: ignore # Ignore if no report is found (e.g., if tests couldn't run)
+
+  combine-and-report:
+    runs-on: ubuntu-latest
+    # This job will only run after both parallel test jobs have completed
+    needs: [test-inventory, test-shopping-cart]
+    permissions: write-all # Needed to download artifacts and upload the combined report
+    steps:
+      - name: Download all TRX reports
+        uses: actions/download-artifact@v4
+        with:
+          # Download artifacts from all previous jobs that produced them.
+          # The path argument specifies the directory where artifacts will be downloaded.
+          path: all-test-results
+
+      - name: List downloaded files (for debugging)
+        # This step helps verify that the TRX files were downloaded correctly
+        run: |
+          echo "Listing contents of downloaded artifacts directory:"
+          ls -R all-test-results || echo "No artifacts downloaded."
+          find all-test-results -name "*.trx" -type f || echo "No .trx files found in downloaded artifacts."
+
 
       - name: Convert TRX to HTML
         uses: dorny/test-reporter@v1
         if: always() # Run even if previous steps fail, to get a report of what happened
         with:
-          name: Test Results
-          # The path now correctly points to where the TRX file should be.
-          path: test_results/results.trx
+          name: Combined Test Results
+          # Use a glob pattern to find all .trx files downloaded into 'all-test-results'
+          path: all-test-results/**/*.trx
           reporter: dotnet-trx
-          # Output the HTML report directly to the test_results folder.
-          output-to: test_results/results.html
+          # Output the combined HTML report within the downloaded artifacts directory
+          output-to: all-test-results/combined-results.html
 
-      - name: Upload test report
+      - name: Upload Combined HTML Report
         uses: actions/upload-artifact@v4
-        if: always() # Upload the artifact even if tests fail
+        if: always() # Upload the artifact even if the conversion step had issues
         with:
-          name: NUnit HTML Report
-          # This will upload both results.trx and results.html from the test_results folder.
-          path: test_results/
-          if-no-files-found: error # Fail the job if no files are found to upload
+          name: NUnit Combined HTML Report # Name for the final combined report artifact
+          path: all-test-results/combined-results.html # Path to the generated combined HTML file
+          if-no-files-found: error # Fail the job if the combined HTML report isn't found
