@@ -1,4 +1,5 @@
 **How to Run Playwright .NET Tests Workflow**
+
 This document provides a quick guide on how to manually trigger and view the results of the Playwright .NET Tests GitHub Actions workflow.
 The single-threaded workflow is configured to run automatically on pushes to the master branch, and it can also be triggered manually using the workflow_dispatch event and the multi-threaded - workflow dispatch only.
 
@@ -12,7 +13,8 @@ To run the workflow manually from the GitHub UI:
 5. Trigger Workflow: Click the "Run workflow" button within the dropdown. This will start a new workflow run.
 ![image](https://github.com/user-attachments/assets/2fa94740-8bc7-4215-87f9-4e4260e45896)
 
-Viewing Workflow Results and Reports
+**Viewing Workflow Results and Reports**
+
 Once the workflow starts and completes:
 
 Monitor the Run: You'll be redirected to the workflow run page. Here, you can see the progress of each job (test-inventory and test-shopping-cart) in real-time.
