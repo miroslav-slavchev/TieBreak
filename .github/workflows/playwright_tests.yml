@@ -1,56 +1,64 @@
 name: Playwright .NET Tests
+
 on:
   workflow_dispatch:
   push:
     branches: [ master ]
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
       - name: Restore dependencies
         run: dotnet restore
+
       - name: Build solution
-        run: dotnet build --configuration Release
+        run: dotnet dotnet build --configuration Release
+
       - name: Install Playwright CLI
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
+
       - name: Create test_results folder
         run: mkdir -p test_results
+
       - name: Run tests and generate TRX report
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=test_results/results.trx"
+        # The --results-directory ensures the TRX file is placed in the specified folder.
+        # LogFileName specifies the file name within that directory.
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results.trx" --results-directory test_results
+
       - name: Check if TRX report was created
+        # This step helps verify the file path for debugging purposes.
         run: |
-          echo "Looking for TRX files..."
-          find . -name "*.trx" -type f
-          ls -la test_results/ || echo "No test_results folder"
+          echo "Looking for TRX files in test_results directory..."
+          ls -la test_results/ || echo "No test_results folder or files found"
+          find test_results/ -name "*.trx" -type f
+
       - name: Convert TRX to HTML
         uses: dorny/test-reporter@v1
-        if: always()
+        if: always() # Run even if previous steps fail, to get a report of what happened
         with:
           name: Test Results
+          # The path now correctly points to where the TRX file should be.
           path: test_results/results.trx
           reporter: dotnet-trx
+          # Output the HTML report directly to the test_results folder.
           output-to: test_results/results.html
-      - name: Move HTML report to test_results
-        run: |
-          if [ -f "TestResults/results.trx" ]; then
-            cp TestResults/results.trx test_results/results.trx
-          elif [ -f "results.trx" ]; then
-            cp results.trx test_results/results.trx
-          else
-            echo "TRX report not found in expected locations"
-          fi
+
       - name: Upload test report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() # Upload the artifact even if tests fail
         with:
           name: NUnit HTML Report
+          # This will upload both results.trx and results.html from the test_results folder.
           path: test_results/
-          if-no-files-found: error
+          if-no-files-found: error # Fail the job if no files are found to upload
