@@ -39,13 +39,26 @@ jobs:
         # Output to a specific file name in the test_results directory
         run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-inventory.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.InventoryItems"
 
-      - name: Upload Inventory TRX Report
+      - name: Install ReportGenerator for HTML conversion (Inventory)
+        # Install the ReportGenerator tool globally to convert TRX to HTML
+        run: |
+          dotnet tool install -g ReportGenerator
+
+      - name: Convert Inventory TRX to HTML using ReportGenerator
+        # ReportGenerator will process the single TRX file and output an HTML report
+        run: |
+          reportgenerator "-reports:test_results/results-inventory.trx" "-targetdir:test_results/html-report-inventory" -reporttypes:Html
+
+          echo "Listing generated Inventory HTML report directory:"
+          ls -la test_results/html-report-inventory || echo "Inventory HTML report directory not found."
+
+      - name: Upload Inventory HTML Report
         uses: actions/upload-artifact@v4
         if: always() # Upload even if tests fail
         with:
-          name: Inventory-TRX-Report # Unique name for this artifact
-          path: test_results/results-inventory.trx
-          if-no-files-found: ignore # Ignore if no report is found (e.g., if tests couldn't run)
+          name: Inventory-HTML-Report # Unique name for this artifact
+          path: test_results/html-report-inventory/ # Upload the entire HTML report directory
+          if-no-files-found: error # Fail the job if the HTML report isn't found
 
   test-shopping-cart:
     runs-on: ubuntu-latest
@@ -80,72 +93,23 @@ jobs:
         # Output to a specific file name in the test_results directory
         run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-shopping-cart.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.ShoppingCartTests"
 
-      - name: Upload Shopping Cart TRX Report
+      - name: Install ReportGenerator for HTML conversion (Shopping Cart)
+        # Install the ReportGenerator tool globally to convert TRX to HTML
+        run: |
+          dotnet tool install -g ReportGenerator
+
+      - name: Convert Shopping Cart TRX to HTML using ReportGenerator
+        # ReportGenerator will process the single TRX file and output an HTML report
+        run: |
+          reportgenerator "-reports:test_results/results-shopping-cart.trx" "-targetdir:test_results/html-report-shopping-cart" -reporttypes:Html
+
+          echo "Listing generated Shopping Cart HTML report directory:"
+          ls -la test_results/html-report-shopping-cart || echo "Shopping Cart HTML report directory not found."
+
+      - name: Upload Shopping Cart HTML Report
         uses: actions/upload-artifact@v4
         if: always() # Upload even if tests fail
         with:
-          name: ShoppingCart-TRX-Report # Unique name for this artifact
-          path: test_results/results-shopping-cart.trx
-          if-no-files-found: ignore # Ignore if no report is found (e.g., if tests couldn't run)
-
-  combine-and-report:
-    runs-on: ubuntu-latest
-    # This job will only run after both parallel test jobs have completed
-    needs: [test-inventory, test-shopping-cart]
-    permissions: write-all # Needed to download artifacts and upload the combined report
-    steps:
-      - name: Download all TRX reports
-        uses: actions/download-artifact@v4
-        with:
-          # Download artifacts from all previous jobs that produced them.
-          # The path argument specifies the directory where artifacts will be downloaded.
-          path: all-test-results
-
-      - name: List downloaded files (for debugging)
-        # This step helps verify that the TRX files were downloaded correctly
-        run: |
-          echo "Listing contents of downloaded artifacts directory:"
-          ls -R all-test-results || echo "No artifacts downloaded."
-          find all-test-results -name "*.trx" -type f || echo "No .trx files found in downloaded artifacts."
-
-      - name: Consolidate TRX reports
-        # When downloading multiple artifacts, they are placed in subdirectories.
-        # This step moves all .trx files into a single flat directory for easier processing.
-        run: |
-          mkdir -p combined_trx_reports
-          find all-test-results -name "*.trx" -exec cp {} combined_trx_reports/ \;
-          echo "Listing consolidated TRX reports:"
-          ls -la combined_trx_reports/ || echo "No consolidated TRX reports found."
-
-      - name: Install ReportUnit for HTML conversion
-        # Install the ReportUnit tool globally to convert TRX to HTML
-        run: |
-          dotnet tool install -g ReportUnit
-
-      - name: Convert Consolidated TRX to HTML
-        # Use ReportUnit to convert the consolidated TRX files into a single HTML report
-        run: |
-          ReportUnit -i combined_trx_reports/*.trx -o combined_trx_reports/combined-results.html
-          echo "Listing generated HTML report:"
-          ls -la combined_trx_reports/ || echo "HTML report not found."
-
-
-      - name: Generate GitHub Checks Report (dorny/test-reporter)
-        uses: dorny/test-reporter@v1
-        if: always() # Run even if previous steps fail, to get a report of what happened
-        with:
-          name: Combined Test Results (GitHub Checks)
-          # Point to the consolidated directory where all .trx files are now flat.
-          path: combined_trx_reports/*.trx
-          reporter: dotnet-trx
-          # Removed 'output-to' as it's not a supported parameter for this action.
-          # This action primarily creates a report visible in the GitHub 'Checks' tab.
-
-      - name: Upload Combined HTML Report
-        uses: actions/upload-artifact@v4
-        if: always() # Upload the artifact even if the conversion step had issues
-        with:
-          name: NUnit Combined HTML Report # Name for the final combined report artifact
-          # Path to the generated combined HTML file in the consolidated directory.
-          path: combined_trx_reports/combined-results.html
-          if-no-files-found: error # Fail the job if the combined HTML report isn't found
+          name: ShoppingCart-HTML-Report # Unique name for this artifact
+          path: test_results/html-report-shopping-cart/ # Upload the entire HTML report directory
+          if-no-files-found: error # Fail the job if the HTML report isn't found
