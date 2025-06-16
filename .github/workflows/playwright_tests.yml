@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -51,6 +53,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -104,22 +108,32 @@ jobs:
           ls -R all-test-results || echo "No artifacts downloaded."
           find all-test-results -name "*.trx" -type f || echo "No .trx files found in downloaded artifacts."
 
+      - name: Consolidate TRX reports
+        # When downloading multiple artifacts, they are placed in subdirectories.
+        # This step moves all .trx files into a single flat directory for easier processing.
+        run: |
+          mkdir -p combined_trx_reports
+          find all-test-results -name "*.trx" -exec cp {} combined_trx_reports/ \;
+          echo "Listing consolidated TRX reports:"
+          ls -la combined_trx_reports/ || echo "No consolidated TRX reports found."
+
 
       - name: Convert TRX to HTML
         uses: dorny/test-reporter@v1
         if: always() # Run even if previous steps fail, to get a report of what happened
         with:
           name: Combined Test Results
-          # Use a glob pattern to find all .trx files downloaded into 'all-test-results'
-          path: all-test-results/**/*.trx
+          # Point to the consolidated directory where all .trx files are now flat.
+          path: combined_trx_reports/*.trx
           reporter: dotnet-trx
-          # Output the combined HTML report within the downloaded artifacts directory
-          output-to: all-test-results/combined-results.html
+          # Output the combined HTML report within the consolidated directory.
+          output-to: combined_trx_reports/combined-results.html
 
       - name: Upload Combined HTML Report
         uses: actions/upload-artifact@v4
         if: always() # Upload the artifact even if the conversion step had issues
         with:
           name: NUnit Combined HTML Report # Name for the final combined report artifact
-          path: all-test-results/combined-results.html # Path to the generated combined HTML file
+          # Path to the generated combined HTML file in the consolidated directory.
+          path: combined_trx_reports/combined-results.html
           if-no-files-found: error # Fail the job if the combined HTML report isn't found
