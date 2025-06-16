@@ -6,14 +6,13 @@ on:
     branches: [ master ]
 
 jobs:
-  test-inventory:
+  test:
     runs-on: ubuntu-latest
-    permissions: write-all # Permissions needed for checkout and artifact upload
+    # Added permissions to resolve "HttpError: Resource not accessible by integration"
+    permissions: write-all
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -24,92 +23,44 @@ jobs:
         run: dotnet restore
 
       - name: Build solution
-        run: dotnet build --configuration Release
+        run: dotnet dotnet build --configuration Release
 
       - name: Install Playwright CLI
         run: |
           dotnet tool install --global Microsoft.Playwright.CLI
           playwright install --with-deps
 
-      - name: Create test_results folder for Inventory Tests
+      - name: Create test_results folder
         run: mkdir -p test_results
 
-      - name: Run Inventory Tests and generate TRX report
-        # Filter tests by namespace starting with 'SwagLabs.Tests.InventoryItems'
-        # Output to a specific file name in the test_results directory
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-inventory.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.InventoryItems"
+      - name: Run tests and generate TRX report
+        # The --results-directory ensures the TRX file is placed in the specified folder.
+        # LogFileName specifies the file name within that directory.
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results.trx" --results-directory test_results
 
-      - name: Install ReportGenerator for HTML conversion (Inventory)
-        # Install the ReportGenerator tool globally to convert TRX to HTML
+      - name: Check if TRX report was created
+        # This step helps verify the file path for debugging purposes.
         run: |
-          dotnet tool install -g ReportGenerator
+          echo "Looking for TRX files in test_results directory..."
+          ls -la test_results/ || echo "No test_results folder or files found"
+          find test_results/ -name "*.trx" -type f
 
-      - name: Convert Inventory TRX to HTML using ReportGenerator
-        # ReportGenerator will process the single TRX file and output an HTML report
-        run: |
-          reportgenerator "-reports:test_results/results-inventory.trx" "-targetdir:test_results/html-report-inventory" -reporttypes:Html
+      - name: Convert TRX to HTML
+        uses: dorny/test-reporter@v1
+        if: always() # Run even if previous steps fail, to get a report of what happened
+        with:
+          name: Test Results
+          # The path now correctly points to where the TRX file should be.
+          path: test_results/results.trx
+          reporter: dotnet-trx
+          # Output the HTML report directly to the test_results folder.
+          output-to: test_results/results.html
 
-          echo "Listing generated Inventory HTML report directory:"
-          ls -la test_results/html-report-inventory || echo "Inventory HTML report directory not found."
-
-      - name: Upload Inventory HTML Report
+      - name: Upload test report
         uses: actions/upload-artifact@v4
-        if: always() # Upload even if tests fail
+        if: always() # Upload the artifact even if tests fail
         with:
-          name: Inventory-HTML-Report # Unique name for this artifact
-          path: test_results/html-report-inventory/ # Upload the entire HTML report directory
-          if-no-files-found: error # Fail the job if the HTML report isn't found
-
-  test-shopping-cart:
-    runs-on: ubuntu-latest
-    permissions: write-all # Permissions needed for checkout and artifact upload
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build solution
-        run: dotnet build --configuration Release
-
-      - name: Install Playwright CLI
-        run: |
-          dotnet tool install --global Microsoft.Playwright.CLI
-          playwright install --with-deps
-
-      - name: Create test_results folder for Shopping Cart Tests
-        run: mkdir -p test_results
-
-      - name: Run Shopping Cart Tests and generate TRX report
-        # Filter tests by namespace starting with 'SwagLabs.Tests.ShoppingCartTests'
-        # Output to a specific file name in the test_results directory
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-shopping-cart.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.ShoppingCartTests"
-
-      - name: Install ReportGenerator for HTML conversion (Shopping Cart)
-        # Install the ReportGenerator tool globally to convert TRX to HTML
-        run: |
-          dotnet tool install -g ReportGenerator
-
-      - name: Convert Shopping Cart TRX to HTML using ReportGenerator
-        # ReportGenerator will process the single TRX file and output an HTML report
-        run: |
-          reportgenerator "-reports:test_results/results-shopping-cart.trx" "-targetdir:test_results/html-report-shopping-cart" -reporttypes:Html
-
-          echo "Listing generated Shopping Cart HTML report directory:"
-          ls -la test_results/html-report-shopping-cart || echo "Shopping Cart HTML report directory not found."
-
-      - name: Upload Shopping Cart HTML Report
-        uses: actions/upload-artifact@v4
-        if: always() # Upload even if tests fail
-        with:
-          name: ShoppingCart-HTML-Report # Unique name for this artifact
-          path: test_results/html-report-shopping-cart/ # Upload the entire HTML report directory
-          if-no-files-found: error # Fail the job if the HTML report isn't found
+          name: NUnit HTML Report
+          # This will upload both results.trx and results.html from the test_results folder.
+          path: test_results/
+          if-no-files-found: error # Fail the job if no files are found to upload
