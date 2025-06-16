@@ -1,0 +1,125 @@
+name: Playwright .NET Tests Parallel
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+
+jobs:
+  test-inventory:
+    runs-on: ubuntu-latest
+    permissions: write-all # Permissions needed for checkout and artifact upload
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release
+
+      - name: Install Playwright CLI
+        run: |
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps
+
+      - name: Create test_results folder for Inventory Tests
+        run: mkdir -p test_results
+
+      - name: Run Inventory Tests and generate TRX report
+        # Filter tests by namespace starting with 'SwagLabs.Tests.InventoryItems'
+        # Output to a specific file name in the test_results directory
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-inventory.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.InventoryItems"
+
+      - name: Check if Inventory TRX report was created
+        run: |
+          echo "Looking for Inventory TRX files in test_results directory..."
+          ls -la test_results/ || echo "No test_results folder or files found"
+          find test_results/ -name "*.trx" -type f
+
+      - name: Convert Inventory TRX to HTML
+        uses: dorny/test-reporter@v1
+        if: always() # Run even if previous steps fail, to get a report of what happened
+        with:
+          name: Inventory Test Results
+          # The path now correctly points to where the TRX file should be.
+          path: test_results/results-inventory.trx
+          reporter: dotnet-trx
+          # Output the HTML report directly to the test_results folder.
+          output-to: test_results/results-inventory.html
+
+      - name: Upload Inventory HTML Report
+        uses: actions/upload-artifact@v4
+        if: always() # Upload the artifact even if tests fail
+        with:
+          name: NUnit Inventory HTML Report # Unique name for this artifact
+          # This will upload both results-inventory.trx and results-inventory.html from the test_results folder.
+          path: test_results/ # Upload the entire folder to include both TRX and HTML
+          if-no-files-found: error # Fail the job if no files are found to upload
+
+  test-shopping-cart:
+    runs-on: ubuntu-latest
+    permissions: write-all # Permissions needed for checkout and artifact upload
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Perform a full clone to prevent git errors (exit code 128)
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release
+
+      - name: Install Playwright CLI
+        run: |
+          dotnet tool install --global Microsoft.Playwright.CLI
+          playwright install --with-deps
+
+      - name: Create test_results folder for Shopping Cart Tests
+        run: mkdir -p test_results
+
+      - name: Run Shopping Cart Tests and generate TRX report
+        # Filter tests by namespace starting with 'SwagLabs.Tests.ShoppingCartTests'
+        # Output to a specific file name in the test_results directory
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "trx;LogFileName=results-shopping-cart.trx" --results-directory test_results --filter "FullyQualifiedName~SwagLabs.Tests.ShoppingCartTests"
+
+      - name: Check if Shopping Cart TRX report was created
+        run: |
+          echo "Looking for Shopping Cart TRX files in test_results directory..."
+          ls -la test_results/ || echo "No test_results folder or files found"
+          find test_results/ -name "*.trx" -type f
+
+      - name: Convert Shopping Cart TRX to HTML
+        uses: dorny/test-reporter@v1
+        if: always() # Run even if previous steps fail, to get a report of what happened
+        with:
+          name: Shopping Cart Test Results
+          # The path now correctly points to where the TRX file should be.
+          path: test_results/results-shopping-cart.trx
+          reporter: dotnet-trx
+          # Output the HTML report directly to the test_results folder.
+          output-to: test_results/results-shopping-cart.html
+
+      - name: Upload Shopping Cart HTML Report
+        uses: actions/upload-artifact@v4
+        if: always() # Upload the artifact even if tests fail
+        with:
+          name: NUnit Shopping Cart HTML Report # Unique name for this artifact
+          # This will upload both results-shopping-cart.trx and results-shopping-cart.html from the test_results folder.
+          path: test_results/ # Upload the entire folder to include both TRX and HTML
+          if-no-files-found: error # Fail the job if no files are found to upload
