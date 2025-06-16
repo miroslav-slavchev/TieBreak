@@ -24,7 +24,22 @@ jobs:
       - name: Create test_results folder
         run: mkdir -p test_results
       - name: Run tests and generate HTML report
-        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "html;LogFileName=test_results/results.html"
+        run: dotnet test ./SwagLabs.Tests/SwagLabs.Tests.csproj --logger "html;LogFileName=results.html"
+      - name: Check if HTML report was created
+        run: |
+          echo "Looking for HTML files..."
+          find . -name "*.html" -type f
+          ls -la TestResults/ || echo "No TestResults folder"
+          ls -la test_results/ || echo "No test_results folder"
+      - name: Move HTML report to test_results
+        run: |
+          if [ -f "TestResults/results.html" ]; then
+            cp TestResults/results.html test_results/results.html
+          elif [ -f "results.html" ]; then
+            cp results.html test_results/results.html
+          else
+            echo "HTML report not found in expected locations"
+          fi
       - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
